@@ -1,0 +1,82 @@
+name: publish-natives-musl
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - '.github/workflows/publish-mac.yml' # when new targets are added
+      - 'build.gradle.kts' # when the root build script changes
+      - 'api' # when api source is changed
+      - 'native' # when natives are changed
+
+concurrency:
+  group: "pub-musl"
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+          - target: i686-unknown-linux-musl
+            deps: |
+              mkdir -p /root/musl
+              curl -q https://musl.cc/i686-linux-musl-cross.tgz | tar xzf - -C /root/musl
+              ln -s /root/musl/i686-linux-musl-cross/bin/i686-linux-musl-gcc /usr/bin/i686-linux-musl-gcc
+          - target: aarch64-unknown-linux-musl
+            deps: |
+              mkdir -p /root/musl
+              curl -q https://musl.cc/aarch64-linux-musl-cross.tgz | tar xzf - -C /root/musl
+              ln -s /root/musl/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc /usr/bin/aarch64-linux-musl-gcc
+          - target: armv7-unknown-linux-musleabihf
+            deps: |
+              mkdir -p /root/musl
+              curl -q https://musl.cc/armv7l-linux-musleabihf-cross.tgz | tar xzf - -C /root/musl
+              ln -s /root/musl/armv7l-linux-musleabihf-cross/bin/armv7l-linux-musleabihf-gcc /usr/bin/armv7l-linux-musleabihf-gcc
+
+    name: Musl build ${{ matrix.target }}
+    # environment: MavenRelease
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.18
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install Essentials
+        run: |
+          apk add bash curl gcc musl-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-src
+
+      - name: Install linker dependencies
+        run: ${{ matrix.deps }}
+        if: ${{ matrix.deps != '' }}
+
+      - name: Compile natives
+        working-directory: native
+        run: cargo build -r --target=${{ matrix.target }}
+
+      - name: Publish
+        env:
+          ORG_GRADLE_PROJECT_ossrhUser: ${{ secrets.OSSRH_USER }}
+          ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+          ORG_GRADLE_PROJECT_stagingProfile: ${{ secrets.STAGING_PROFILE_ID }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_KEY }}
+          ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEYID }}
+        if: env.ORG_GRADLE_PROJECT_ossrhUser != null
+        run: |
+          chmod u+x gradlew
+          ./gradlew --console plain --stacktrace -Ptarget="${{ matrix.target }}" native:publishToSonatype closeAndReleaseStagingRepository
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: udpqueue-${{ matrix.target }}
+          path: native/target/${{ matrix.target }}/release/*.so

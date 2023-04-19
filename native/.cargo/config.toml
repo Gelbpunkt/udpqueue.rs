@@ -7,3 +7,18 @@ linker = "aarch64-linux-gnu-gcc"
 
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
+
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.i686-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static", "-L", "native=/root/musl/i686-linux-musl-cross/i686-linux-musl/lib", "-L", "native=/root/musl/i686-linux-musl-cross/lib/gcc/i686-linux-musl/11.2.1/"]
+linker = "i686-linux-musl-gcc"
+
+[target.armv7-unknown-linux-musleabihf]
+rustflags = ["-C", "target-feature=-crt-static", "-L", "native=/root/musl/armv7l-linux-musleabihf-cross/armv7l-linux-musleabihf/lib", "-L", "native=/root/musl/armv7l-linux-musleabihf-cross/lib/gcc/armv7l-linux-musleabihf/11.2.1/"]
+linker = "armv7l-linux-musleabihf-gcc"
+
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static", "-L", "native=/root/musl/aarch-linux-musl-cross/aarch64-linux-musl/lib", "-L", "native=/root/musl/aarch-linux-musl-cross/lib/gcc/aarch64-linux-musl/11.2.1/"]
+linker = "aarch64-linux-musl-gcc"
