@@ -62,6 +62,7 @@ jobs:
           ORG_GRADLE_PROJECT_stagingProfile: ${{ secrets.STAGING_PROFILE_ID }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_KEY }}
           ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEYID }}
+        if: env.ORG_GRADLE_PROJECT_ossrhUser != null
         run: |
           chmod u+x gradlew
           ./gradlew --console plain --stacktrace -Ptarget="${{ matrix.target }}" native:publishToSonatype closeAndReleaseStagingRepository
@@ -97,6 +98,7 @@ jobs:
           ORG_GRADLE_PROJECT_stagingProfile: ${{ secrets.STAGING_PROFILE_ID }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.GPG_KEY }}
           ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.GPG_KEYID }}
+        if: env.ORG_GRADLE_PROJECT_ossrhUser != null
         run: |
           chmod u+x gradlew
           ./gradlew --console plain --stacktrace -Ptarget="${{ matrix.target }}" native:publishToSonatype closeAndReleaseStagingRepository
