@@ -68,6 +68,12 @@ jobs:
           chmod u+x gradlew
           ./gradlew --console plain --stacktrace -Ptarget="${{ matrix.target }}" native:publishToSonatype closeAndReleaseStagingRepository
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: udpqueue-${{ matrix.target }}
+          path: native/target/${{ matrix.target }}/release/*.so
+
   windows:
     strategy:
       matrix:
@@ -104,3 +110,9 @@ jobs:
         run: |
           chmod u+x gradlew
           ./gradlew --console plain --stacktrace -Ptarget="${{ matrix.target }}" native:publishToSonatype closeAndReleaseStagingRepository
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: udpqueue-${{ matrix.target }}
+          path: native/target/${{ matrix.target }}/release/*.dll

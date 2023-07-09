@@ -51,3 +51,9 @@ jobs:
         run: |
           chmod u+x gradlew
           ./gradlew --console plain --stacktrace -Ptarget=darwin native:publishToSonatype closeAndReleaseStagingRepository
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: udpqueue-apple-darwin-universal
+          path: native/target/darwin/release/*.dylib
