@@ -42,8 +42,15 @@ jobs:
         with:
           components: clippy, rust-src
 
-      - name: Install required cargo
-        run: cargo install clippy-sarif sarif-fmt
+      - name: Install clippy-sarif
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: clippy-sarif
+
+      - name: Install sarif-fmt
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: sarif-fmt
 
       - name: Run rust-clippy
         working-directory: native
