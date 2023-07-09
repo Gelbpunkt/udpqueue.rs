@@ -10,7 +10,7 @@ jni = "0.21"
 crate_type = ["cdylib"]
 
 [profile.release]
-opt-level = 3
+codegen-units = 1
 lto = true
 strip = "debuginfo"
 panic = "abort"
