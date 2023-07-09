@@ -1,4 +1,4 @@
-use jni::objects::{JClass, JString, JValue};
+use jni::objects::{JByteBuffer, JClass, JString, JValue, JValueGen};
 use jni::sys::{jboolean, jint, jlong, jobject};
 use jni::JNIEnv;
 use sender::{Manager, Sockets};
@@ -14,28 +14,34 @@ fn get_handle(instance: jlong) -> &'static Manager {
 
 #[inline(always)]
 fn parse_address(
-    env: &JNIEnv,
-    string: JString,
+    env: &mut JNIEnv,
+    string: &JString,
     port: jint,
 ) -> Result<SocketAddr, Box<dyn std::error::Error>> {
     Ok(SocketAddr::new(
-        env.get_string(string)?.to_str()?.parse()?,
+        unsafe { env.get_string_unchecked(string) }?
+            .to_str()?
+            .parse()?,
         port as u16,
     ))
 }
 
 #[inline(always)]
 fn copy_data(env: &JNIEnv, buffer: jobject, length: jint) -> Result<Box<[u8]>, jni::errors::Error> {
+    let buffer = unsafe { JByteBuffer::from_raw(buffer) };
     let length = length as usize;
-    let slice = env.get_direct_buffer_address(buffer.into())?;
-    Ok(Box::from(&slice[..length]))
+    let slice_addr = env.get_direct_buffer_address(&buffer)?;
+    let slice = unsafe { std::slice::from_raw_parts(slice_addr, length) };
+
+    Ok(Box::from(slice))
 }
 
 /// Wrapper for System.getProperty(String): String?
 #[inline]
-fn get_property(env: &JNIEnv, name: &str) -> Option<String> {
+fn get_property(env: &mut JNIEnv, name: &str) -> Option<String> {
     let class = env.find_class("java/lang/System").ok()?;
-    let args = JValue::Object(env.new_string(name).ok()?.into());
+    let string = env.new_string(name).ok()?;
+    let args = JValue::Object(&string);
 
     match env.call_static_method(
         class,
@@ -43,8 +49,8 @@ fn get_property(env: &JNIEnv, name: &str) -> Option<String> {
         "(Ljava/lang/String;)Ljava/lang/String;",
         &[args],
     ) {
-        Ok(JValue::Object(obj)) => Some(
-            env.get_string(JString::from(obj))
+        Ok(JValueGen::Object(obj)) => Some(
+            env.get_string(&JString::from(obj))
                 .ok()?
                 .to_str()
                 .ok()?
@@ -57,7 +63,7 @@ fn get_property(env: &JNIEnv, name: &str) -> Option<String> {
 /// Whether to log send errors, default true
 /// Configured using -Dudpqueue.log_errors=<bool>
 #[inline]
-fn is_log_errors(env: &JNIEnv) -> bool {
+fn is_log_errors(env: &mut JNIEnv) -> bool {
     get_property(env, "udpqueue.log_errors")
         .map(|s| s == "true")
         .unwrap_or(true)
@@ -118,7 +124,7 @@ pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_Ud
 
 #[allow(unused, clippy::too_many_arguments)]
 fn queue_packet(
-    env: JNIEnv,
+    mut env: JNIEnv,
     me: jobject,
     instance: jlong,
     key: jlong,
@@ -140,7 +146,7 @@ fn queue_packet(
         }
     };
 
-    let address = match parse_address(&env, address_string, port) {
+    let address = match parse_address(&mut env, &address_string, port) {
         Ok(a) => a,
         Err(e) => {
             eprintln!("Invalid socket address provided: {e}");
@@ -194,11 +200,11 @@ pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_Ud
 #[no_mangle]
 #[allow(non_snake_case, unused)]
 pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_UdpQueueManagerLibrary_process(
-    env: JNIEnv,
+    mut env: JNIEnv,
     me: jobject,
     instance: jlong,
 ) {
-    let log_errors = is_log_errors(&env);
+    let log_errors = is_log_errors(&mut env);
     if instance != 0 {
         get_handle(instance).process(log_errors);
     }
@@ -220,7 +226,7 @@ pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_Ud
 #[no_mangle]
 #[allow(non_snake_case, unused)]
 pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_UdpQueueManagerLibrary_processWithSocket(
-    env: JNIEnv,
+    mut env: JNIEnv,
     me: jobject,
     instance: jlong,
     socketv4: jlong,
@@ -245,7 +251,7 @@ pub extern "system" fn Java_com_sedmelluq_discord_lavaplayer_udpqueue_natives_Ud
 
     let sockets = Sockets { v4, v6 };
 
-    let log_errors = is_log_errors(&env);
+    let log_errors = is_log_errors(&mut env);
     get_handle(instance).process_with_sockets(log_errors, &sockets);
 
     // This gives up ownership of the file descriptors back to the caller, allowing them to stay open
